@@ -1,0 +1,88 @@
+name: Deploy to Elastic Beanstalk
+
+on:
+  push:
+    branches: [main]
+
+env:
+  AWS_REGION: us-east-1
+  EB_APP_NAME: task-manager
+  EB_ENV_NAME: task-manager-env
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: secret
+          MYSQL_DATABASE: laravel_test
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h localhost"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=5
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: mbstring, pdo_mysql, bcmath, gd, zip
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Prepare environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run tests
+        env:
+          DB_CONNECTION: mysql
+          DB_HOST: 127.0.0.1
+          DB_PORT: 3306
+          DB_DATABASE: laravel_test
+          DB_USERNAME: root
+          DB_PASSWORD: secret
+        run: php artisan test
+
+  deploy:
+    name: Deploy to EB
+    needs: test
+    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.4"
+          extensions: mbstring, pdo_mysql, bcmath, gd, zip
+          coverage: none
+
+      - name: Install dependencies (production)
+        run: composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Generate deployment package
+        run: zip -r deploy.zip . -x ".git/*" "tests/*" "node_modules/*" ".env" "*.md"
+
+      - name: Deploy to Elastic Beanstalk
+        uses: einaregilsson/beanstalk-deploy@v22
+        with:
+          aws_access_key: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws_secret_key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          application_name: ${{ env.EB_APP_NAME }}
+          environment_name: ${{ env.EB_ENV_NAME }}
+          version_label: "v${{ github.run_number }}-${{ github.sha }}"
+          region: ${{ env.AWS_REGION }}
+          deployment_package: deploy.zip
+          wait_for_environment_recovery: 120

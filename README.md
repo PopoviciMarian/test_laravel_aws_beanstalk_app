@@ -55,18 +55,40 @@ eb deploy
 eb open
 ```
 
+## CI/CD with GitHub Actions
+
+Pushing to `main` automatically runs tests and deploys to Elastic Beanstalk.
+
+### Required GitHub Secrets
+
+Add these in **Settings > Secrets and variables > Actions**:
+
+| Secret                | Description                       |
+|-----------------------|-----------------------------------|
+| `AWS_ACCESS_KEY_ID`   | IAM user access key               |
+| `AWS_SECRET_ACCESS_KEY` | IAM user secret key             |
+
+The IAM user needs permissions for `elasticbeanstalk:*` and `s3:*` (for uploading deployment artifacts).
+
+### Workflow
+
+1. **Test** -- Installs dependencies, spins up a MySQL service container, runs `php artisan test`
+2. **Deploy** -- Zips the app (production deps only), deploys to EB via `beanstalk-deploy`
+
 ## Project Structure (Beanstalk)
 
 ```
 .ebextensions/
-  01-laravel.config      # PHP settings, document root, env vars
-  02-permissions.config  # storage/cache directory permissions
+  01-laravel.config          # PHP settings, document root, env vars
+  02-permissions.config      # storage/cache directory permissions
+.github/workflows/
+  deploy.yml                 # CI/CD: test + deploy on push to main
 .platform/
   hooks/postdeploy/
-    01_migrate.sh         # Runs migrations + caches config after deploy
+    01_migrate.sh            # Runs migrations + caches config after deploy
   nginx/conf.d/
     elasticbeanstalk/
-      laravel.conf        # Nginx rewrite rules for Laravel
+      laravel.conf           # Nginx rewrite rules for Laravel
 ```
 
 ## Features
