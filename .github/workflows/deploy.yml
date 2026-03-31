@@ -106,7 +106,17 @@ jobs:
 
       - name: Wait for deployment
         run: |
-          aws elasticbeanstalk wait environment-updated \
-            --application-name "$EB_APP_NAME" \
-            --environment-names "$EB_ENV_NAME"
-          echo "Deployment complete!"
+          echo "Waiting for environment to finish updating..."
+          for i in $(seq 1 30); do
+            STATUS=$(aws elasticbeanstalk describe-environments \
+              --environment-names "$EB_ENV_NAME" \
+              --query "Environments[0].Status" --output text)
+            echo "  Attempt $i: Status=$STATUS"
+            if [ "$STATUS" = "Ready" ]; then
+              echo "Deployment complete!"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Timed out waiting for deployment"
+          exit 1

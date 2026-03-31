@@ -1,4 +1,4 @@
-# Task Manager - Laravel CRUD App
+# Task Manager-2 - Laravel CRUD App
 
 A simple task management CRUD application built with Laravel 13, deployed on AWS Elastic Beanstalk.
 
